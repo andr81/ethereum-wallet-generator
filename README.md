@@ -1,139 +1,118 @@
 # Ethereum Offline Keygen
 
-Небольшой воспроизводимый проект для создания Ethereum HD-кошелька в одноразовом Docker-контейнере без сети. Генератор выдаёт новую 24-словную BIP-39 seed-фразу, публичный узел и XPUB для пути `m/44'/60'/0'/0`, а также контрольные адреса `/0`, `/1`, `/2` и далее.
+Generates an Ethereum HD wallet inside a throwaway, network-less Docker container: a 24-word BIP-39
+seed phrase, the account XPUB for `m/44'/60'/0'/0`, and deposit addresses derived from it. No
+server, no open ports; the code writes no files and no logs. A single address receives both ETH and
+any ERC-20 token on the chosen network.
 
-Проект не запускает сервер, не открывает порты и не пишет секреты в файлы. Один Ethereum-адрес может принимать как ETH, так и разные ERC-20 токены в выбранной сети.
+## How it works
 
-## Модель работы
+Dependencies cannot be fetched inside a fully offline container, so the process is split in two:
 
-Процесс намеренно разделён на две стадии:
+1. **`build-image.sh`** — run with internet. Installs `ethers` 6.17.0 into a build stage; the
+   runtime stage only copies the result. No keys are created here.
+2. **`generate.sh`** — run after physically disconnecting Wi-Fi and Ethernet. Starts a one-shot
+   container with `--network=none`, no volumes, no host paths, no Docker socket, removed on exit.
 
-1. `build-image.sh` выполняется заранее, пока интернет доступен. Docker загружает зафиксированный базовый образ Node.js 24 LTS и `ethers` 6.17.0. На этой стадии seed-фразы и ключи не создаются.
-2. `generate.sh` запускается после физического отключения сети. Он создаёт одноразовый контейнер с `--network=none`, без каталогов хоста, volumes, Docker socket, SSH agent и облачных credentials. После выхода контейнер удаляется (`--rm`).
-
-Зависимости невозможно впервые скачать внутри полностью офлайн-контейнера: для загрузки Node.js, `ethers` и транзитивных пакетов интернет нужен хотя бы один раз. Поэтому все зависимости устанавливаются в build-stage командой `npm ci --omit=dev --ignore-scripts` и переносятся в runtime-образ. Runtime ничего не устанавливает и не скачивает.
-
-## Быстрый старт
-
-Требуются Docker Engine и обычный терминал. Сначала изучите исходный код и README, затем выполните:
+## Quick start
 
 ```bash
-chmod +x *.sh
-./build-image.sh
-./self-test.sh
-./generate.sh 10
-./verify-recovery.sh
+./build-image.sh          # the only step that needs internet
+./self-test.sh            # deterministic check, no real secrets
+./generate.sh 10          # offline; type GENERATE to confirm
+./verify-recovery.sh 10   # offline; re-derive from a seed you type back
 ```
 
-`generate.sh` без аргумента показывает 5 адресов; допустимо от 1 до 1000. `verify-recovery.sh` также принимает необязательное количество адресов, например `./verify-recovery.sh 10`.
+Address count is optional, 1–1000, default 5.
 
-Никогда не перенаправляйте вывод генератора в файл и не используйте `tee`. Перед генерацией физически отключите Wi-Fi и Ethernet, закройте программы записи экрана и подготовьте бумагу. Скрипт потребует вручную ввести `GENERATE`.
+**Never redirect the generator into a file or pipe it through `tee`.** Disconnect the network, close
+screen recorders, and have pen and paper ready — the seed phrase appears in the terminal and nowhere
+else.
 
-## Что создаётся
+## What you get
 
-Базовый публичный узел:
+The account node is `m/44'/60'/0'/0`; addresses are its children `/0`, `/1`, `/2`, and so on. The
+generator prints the seed phrase, the path, the master fingerprint, the account public key, the
+XPUB, and per child a checksummed address with its compressed public key. The XPRV and per-address
+private keys are never printed.
 
-```text
-m/44'/60'/0'/0
-```
+Because the XPUB belongs to the account node itself, a server derives every child address from it by
+index alone — no seed phrase, no private keys.
 
-Адреса:
+Randomness comes from the OS CSPRNG via `node:crypto`; BIP-39, BIP-32, secp256k1 and address
+encoding are handled by `ethers`. No hand-rolled cryptography.
 
-```text
-m/44'/60'/0'/0/0
-m/44'/60'/0'/0/1
-m/44'/60'/0'/0/2
-...
-```
+## Self-test
 
-XPUB относится именно к базовому узлу `m/44'/60'/0'/0`. Поэтому сервер может получить дочерние адреса по обычным индексам `/0`, `/1`, `/2` без seed-фразы и приватных ключей. Генератор печатает seed-фразу, путь, fingerprint мастер-узла, сжатый публичный ключ базового узла, XPUB, а затем checksum-адрес и сжатый публичный ключ каждого ребёнка. XPRV и дочерние приватные ключи не выводятся.
+Runs under the same restrictions and never generates a random seed. It uses the publicly known
+phrase `test test test test test test test test test test test junk` — which must never hold money —
+and asserts that `m/44'/60'/0'/0/0` resolves to `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`. It
+also checks that the XPUB-derived address matches the private-node one and that no external network
+interfaces exist. Any failure exits non-zero.
 
-Случайность берётся из криптографически безопасного системного генератора через `node:crypto`. BIP-39, BIP-32, secp256k1 и Ethereum-адреса реализует `ethers`; проект не содержит самодельной криптографии.
+## Recovery check
 
-## Самопроверка
+`verify-recovery.sh` opens an offline container with an interactive TTY. The seed is read from stdin
+with echo suppressed, never as a process argument or environment variable, and the XPUB and first
+addresses are re-derived so you can compare them with your paper record. The code writes nothing to
+disk; terminal scrollback and host swap are outside its control.
 
-`self-test.sh` запускается с теми же ограничениями, read-only root filesystem и отключённой сетью. Тест не создаёт случайную seed-фразу. Он использует только общеизвестную фразу:
+The code then zeroes buffers and drops references, but JavaScript strings are immutable and the
+garbage collector may leave copies in memory. Discarding the container shortens process lifetime; it
+does not give provable memory wiping.
 
-```text
-test test test test test test test test test test test junk
-```
+## What is secret
 
-Она публична и никогда не должна использоваться для денег. Проверяется ожидаемый адрес для `m/44'/60'/0'/0/0`:
+The seed phrase is the whole wallet: it controls ETH and every ERC-20 token on every derived
+address. Never move it to a server, cloud storage, a messenger, a screenshot or email. A password
+manager is defensible only with a deliberate threat model and the understanding that it gives up
+fully offline storage. Your terminal
+keeps it in scrollback until the window closes — clear it once the paper record is safe, and account
+for shell history, session recording and system swap.
 
-```text
-0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-```
+Only the XPUB of `m/44'/60'/0'/0`, the derivation path, and optionally the master fingerprint ever
+reach a server. The XPUB cannot spend funds, but it reveals every child address and the branch's
+financial history, so treat it as sensitive. `ACCOUNT PUBLIC KEY` is not a private key either.
 
-Также тест проверяет совпадение адреса, выведенного из XPUB, с адресом приватного HD-узла и отсутствие внешних сетевых интерфейсов. Любая ошибка даёт ненулевой exit code.
+## What Docker does and does not cover
 
-Docker в attached-режиме передаёт stdout/stderr непосредственно клиенту, даже когда `--log-driver=none` отключает долговременное сохранение логов Docker. Поэтому вывод self-test должен быть виден в терминале, но не попадать в журнал контейнера. Если конкретная нестандартная сборка Docker скрывает attached stdout, выполните диагностически ту же команду вручную без `--log-driver=none` только для публичного self-test; production-генератор с логированием не запускайте.
+The container runs with no network, a read-only root filesystem, an unprivileged user, all Linux
+capabilities dropped, no privilege escalation, CPU/RAM/PID limits and a temporary `/tmp`. No bind
+mounts, no volumes, no `--privileged`, no `/var/run/docker.sock`.
 
-## Проверка восстановления
+| Covered | **Not** covered |
+| --- | --- |
+| Accidental network egress from the container | A compromised host system |
+| Writes escaping to the host filesystem | A compromised Docker Engine or base image |
+| Privilege escalation inside the container | Keyloggers, screen recording, cameras, bystanders |
+| | Memory reads with admin rights |
 
-`verify-recovery.sh` запускает offline-контейнер с интерактивным TTY. Seed-фраза читается только из stdin с отключённым отображением и не передаётся в аргументах процесса или переменных окружения. Из неё повторно выводятся XPUB и первые адреса для сравнения с бумажной записью. Результаты не сохраняются.
+Review the sources and your environment's integrity. For significant amounts prefer a hardware
+wallet, a dedicated air-gapped machine, or an HSM.
 
-После работы код обнуляет изменяемые буферы и удаляет доступные ссылки на секрет. Но строки JavaScript неизменяемы, сборщик мусора может оставить копии в памяти, а Node.js не гарантирует их мгновенное и полное очищение. Завершение и удаление одноразового контейнера сокращает время жизни процесса, но не превращает JavaScript в среду с доказуемым стиранием памяти.
+## Using the XPUB on a server
 
-## Что секретно
-
-Seed-фраза — главный секрет: она полностью контролирует ETH и все ERC-20 токены на всех производных адресах. Никогда не переносите её на production-сервер. Не храните её в облаке, мессенджере, скриншоте, электронной почте или бездумно в password manager. Password manager допустим только при осознанной модели угроз и понимании того, что это меняет полностью офлайн-модель хранения.
-
-Терминал показывает seed-фразу и может хранить её в scrollback до закрытия окна. Очистите/закройте окно после надёжной бумажной записи. Учитывайте историю терминала, запись сессий и системный swap.
-
-На сервер переносятся только:
-
-- XPUB узла `m/44'/60'/0'/0`;
-- сам derivation path;
-- при необходимости master fingerprint для идентификации кошелька.
-
-XPUB не позволяет тратить средства, но раскрывает все дочерние адреса и финансовую историю ветки, поэтому это чувствительная публичная информация. `ACCOUNT PUBLIC KEY` также не является приватным ключом.
-
-## Границы защиты Docker
-
-Контейнер запускается с отключённой сетью, read-only root filesystem, непривилегированным пользователем, удалёнными Linux capabilities, запретом повышения привилегий, лимитами CPU/RAM/PID и временным `/tmp`. Скрипты не используют bind mounts, volumes, `--privileged` или `/var/run/docker.sock`.
-
-Эти меры защищают главным образом от случайной сетевой утечки из контейнера. Они не защищают от заражённой хост-системы, скомпрометированного Docker Engine или базового образа, кейлоггера, чтения памяти с правами администратора, записи экрана, физической камеры и человека рядом. Проверяйте исходники и целостность среды. Для крупных сумм предпочтительнее аппаратный кошелёк, отдельный air-gapped компьютер или HSM.
-
-## Использование XPUB на сервере
-
-Минимальный публичный пример находится в `src/derive-from-xpub.mjs` и не содержит настоящего XPUB:
+`src/derive-from-xpub.mjs` holds a minimal example and no real XPUB:
 
 ```js
 import { HDNodeWallet } from "ethers";
 
-const xpub = "xpub_REPLACE_WITH_YOUR_ACCOUNT_XPUB";
-const index = 0;
-
-const publicNode = HDNodeWallet.fromExtendedKey(xpub);
-const child = publicNode.deriveChild(index);
-console.log(child.address);
+const publicNode = HDNodeWallet.fromExtendedKey("xpub_REPLACE_WITH_YOUR_ACCOUNT_XPUB");
+console.log(publicNode.deriveChild(0).address);
 ```
 
-Сервер должен атомарно резервировать новый индекс и хранить соответствие:
+The server must reserve each index atomically and persist `user_id -> derivation_index -> address`.
+**An index must never go to two users** — one deposit address would then map to several accounts and
+automatic crediting becomes ambiguous. Enforce it with a unique constraint and allocate under a
+transaction or lock.
 
-```text
-user_id -> derivation_index -> address
-```
+## Networks, tokens and gas
 
-Один индекс нельзя повторно выдавать разным пользователям: иначе один депозитный адрес окажется связан с несколькими пользователями, и автоматическое зачисление станет неоднозначным. Защитите уникальность индекса ограничением в базе данных и транзакцией/блокировкой при выдаче.
+A token balance lives in one contract on one chain. Ethereum, Arbitrum, Base, Polygon and BNB Chain
+differ in chain ID, contracts, risks and native coin even where EVM addresses look identical — a
+transfer on one is not a transfer on another.
 
-## Сети, токены и газ
-
-Один адрес способен принимать ETH и разные ERC-20 токены, но токен — это баланс внутри конкретного контракта в конкретной сети. Ethereum, Arbitrum, Base, Polygon и BNB Chain — разные сети с разными chain ID, контрактами, рисками и нативными монетами, даже если EVM-адреса визуально совпадают. Не считайте перевод в одной сети переводом в другой.
-
-Для последующего вывода ERC-20 с каждого депозитного адреса этому адресу обычно потребуется нативная монета сети для газа — в Ethereum это ETH. Заранее спроектируйте безопасное пополнение газа и sweep средств.
-
-Перед использованием реальных денег полностью проверьте выдачу адресов, отслеживание депозитов, confirmations, reorg handling, газ и вывод на тестовой сети Sepolia. Тестируйте восстановление seed-фразы на изолированной машине до приёма первого реального депозита.
-
-## Состав и воспроизводимость
-
-- `Dockerfile` — multi-stage образ Node.js 24 LTS; runtime работает как пользователь `node`.
-- `package.json` и `package-lock.json` — точные npm-зависимости.
-- `build-image.sh` — только сборка образа, без генерации.
-- `generate.sh` — production-генерация только в offline-контейнере.
-- `self-test.sh` — безопасный детерминированный тест.
-- `verify-recovery.sh` — скрытый интерактивный ввод seed-фразы.
-- `src/security.mjs` — проверка сетевых интерфейсов и входных параметров.
-
-`.dockerignore` исключает `.git`, README, shell-скрипты, host `node_modules` и потенциальные файлы секретов. В runtime-образ попадают только runtime-зависимости и каталог `src`.
-
+Sweeping ERC-20 tokens off a deposit address normally requires that address to hold the chain's
+native coin for gas, so design top-ups and sweeps before you need them. Exercise the whole flow on
+Sepolia — issuance, deposit detection, confirmations, reorg handling, gas, withdrawal — and test
+seed recovery on an isolated machine before accepting the first real deposit.
