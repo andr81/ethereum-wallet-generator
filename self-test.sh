@@ -1,25 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE_REF="ethereum-offline-keygen:1.0.0"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
 
-if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
-  echo "Error: Docker Engine is unavailable." >&2
-  exit 1
-fi
+require_docker
 
-docker run \
-  --rm \
-  --pull=never \
-  --network=none \
-  --read-only \
-  --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-  --cap-drop=ALL \
-  --security-opt=no-new-privileges \
-  --pids-limit=64 \
-  --memory=256m \
-  --cpus=1 \
-  --log-driver=none \
-  --entrypoint=node \
-  "${IMAGE_REF}" src/self-test.mjs
-
+docker run "${OFFLINE_RUN_ARGS[@]}" --entrypoint=node "${IMAGE_REF}" src/self-test.mjs
