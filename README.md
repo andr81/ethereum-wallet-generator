@@ -25,9 +25,10 @@ Dependencies cannot be fetched inside a fully offline container, so the process 
 
 Address count is optional, 1–1000, default 5.
 
-**Never redirect the generator into a file or pipe it through `tee`.** Disconnect the network, close
-screen recorders, and have pen and paper ready — the seed phrase appears in the terminal and nowhere
-else.
+`generate.sh` and `verify-recovery.sh` refuse to run unless stdin and stdout are both a terminal, so
+redirecting them into a file or piping them through `tee` fails instead of silently writing the seed
+phrase to disk. They also refuse a non-local Docker endpoint, which would stream the phrase to a
+remote daemon. Disconnect the network, close screen recorders, and have pen and paper ready.
 
 ## What you get
 
@@ -38,6 +39,9 @@ private keys are never printed.
 
 Because the XPUB belongs to the account node itself, a server derives every child address from it by
 index alone — no seed phrase, no private keys.
+
+**No BIP-39 passphrase is used.** The optional 25th word is always empty, so restoring in another
+wallet requires leaving its passphrase field blank.
 
 Randomness comes from the OS CSPRNG via `node:crypto`; BIP-39, BIP-32, secp256k1 and address
 encoding are handled by `ethers`. No hand-rolled cryptography.
@@ -55,7 +59,8 @@ interfaces exist. Any failure exits non-zero.
 `verify-recovery.sh` opens an offline container with an interactive TTY. The seed is read from stdin
 with echo suppressed, never as a process argument or environment variable, and the XPUB and first
 addresses are re-derived so you can compare them with your paper record. The code writes nothing to
-disk; terminal scrollback and host swap are outside its control.
+disk and the container cannot swap, but terminal scrollback and host-level logging remain outside
+its control.
 
 The code then zeroes buffers and drops references, but JavaScript strings are immutable and the
 garbage collector may leave copies in memory. Discarding the container shortens process lifetime; it
@@ -79,6 +84,13 @@ financial history, so treat it as sensitive. `ACCOUNT PUBLIC KEY` is not a priva
 The container runs with no network, a read-only root filesystem, an unprivileged user, all Linux
 capabilities dropped, no privilege escalation, CPU/RAM/PID limits and a temporary `/tmp`. No bind
 mounts, no volumes, no `--privileged`, no `/var/run/docker.sock`.
+
+Swap is disabled with `--memory-swap` equal to `--memory` — Docker otherwise allows twice the memory
+limit in swap, which is a path for the seed phrase to reach the host's disk. Core dumps are blocked
+with `--ulimit core=0:0`, and the ten proxy variables the Docker CLI can inject from
+`~/.docker/config.json` are blanked. Every one of these restrictions is defined once, in
+`lib/common.sh`, and shared by all three run scripts. The base image is pinned by digest, not by its
+mutable tag.
 
 | Covered | **Not** covered |
 | --- | --- |

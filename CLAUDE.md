@@ -33,6 +33,8 @@ docker run --rm --network=none --entrypoint=node ethereum-offline-keygen:1.0.0 s
 
 ### Two traps when running locally
 
+- **`generate.sh` and `verify-recovery.sh` refuse a non-TTY.** They are unrunnable from a
+  non-interactive tool call by design; drive them by hand in a terminal.
 - **`npm run self-test` always fails on the host.** Every entrypoint calls
   `assertNoExternalNetwork()` first, and any normal machine has Wi-Fi, so the test dies on
   "External network interfaces detected". That is the guard working, not a breakage — tests only
@@ -61,10 +63,15 @@ The duplication is deliberate. **A new entrypoint must call `assertNoExternalNet
 statement** — the sole exception is `src/derive-from-xpub.mjs`, which is meant to run online on a
 server.
 
-The same block of twelve Docker flags is copy-pasted into `generate.sh`, `self-test.sh` and
-`verify-recovery.sh`; changing the restrictions means editing all three. The image reference
-`ethereum-offline-keygen:1.0.0` is hard-coded there too — a version bump has to be synchronised
-across four scripts and `package.json`.
+`lib/common.sh` is the single source for the image reference, the `OFFLINE_RUN_ARGS` restriction
+array and the shared guards (`require_docker`, `require_local_docker_endpoint`,
+`require_address_count`, `require_interactive_terminal`). **Add a container restriction there, never
+in an individual script** — the point of the file is that generation, self-test and recovery cannot
+drift apart. It is sourced via `BASH_SOURCE`, so the scripts work from any cwd, and it is excluded
+from the build context.
+
+The base image is pinned by digest in the `Dockerfile`; bumping the version means updating both
+stages and `IMAGE_VERSION` in `lib/common.sh`.
 
 ### The secrecy boundary is what splits the files
 
