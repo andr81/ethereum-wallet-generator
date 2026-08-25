@@ -21,7 +21,7 @@ try {
   const accountNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", BASE_PATH);
   const publicNode = accountNode.neuter();
 
-  console.log("\n=== СЕКРЕТНЫЕ ДАННЫЕ: ПЕРЕПИШИТЕ НА БУМАГУ ===\n");
+  console.log("\n=== SECRET DATA: COPY THIS ONTO PAPER ===\n");
   console.log(`SEED PHRASE: ${mnemonic.phrase}`);
   console.log(`DERIVATION PATH: ${BASE_PATH}`);
   console.log(`MASTER FINGERPRINT: ${masterNode.fingerprint}`);
@@ -38,11 +38,11 @@ try {
   }
 
   console.log(
-    "\nВНИМАНИЕ: seed-фраза полностью контролирует ETH и все ERC-20 токены на этих адресах. " +
-      "Не храните её на компьютере и никому не передавайте.\n",
+    "\nWARNING: this seed phrase fully controls ETH and every ERC-20 token on these addresses. " +
+      "Do not keep it on a computer and do not share it with anyone.\n",
   );
 } catch (error) {
-  console.error(`ОШИБКА: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
 } finally {
   wipeBytes(entropy);

@@ -1,7 +1,7 @@
 import { HDNodeWallet } from "ethers";
 
-// Публичный пример. Подставляйте XPUB безопасным способом в коде сервера;
-// не передавайте его этому примеру через командную строку в production.
+// Public example. Supply the XPUB securely from your server code;
+// do not pass it to this example on the command line in production.
 const xpub = "xpub_REPLACE_WITH_YOUR_ACCOUNT_XPUB";
 const index = 0;
 

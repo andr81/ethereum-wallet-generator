@@ -21,10 +21,10 @@ const hiddenOutput = new Writable({
 
 async function readHiddenSeed() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    throw new Error("Для скрытого ввода seed-фразы требуется интерактивный TTY.");
+    throw new Error("Hidden seed phrase entry requires an interactive TTY.");
   }
 
-  process.stdout.write("Введите seed-фразу (ввод скрыт): ");
+  process.stdout.write("Enter the seed phrase (input hidden): ");
   const readline = createInterface({
     input: process.stdin,
     output: hiddenOutput,
@@ -45,7 +45,7 @@ try {
   seedPhrase = (await readHiddenSeed()).trim().replace(/\s+/g, " ");
 
   if (!Mnemonic.isValidMnemonic(seedPhrase)) {
-    throw new Error("Seed-фраза не прошла проверку BIP-39.");
+    throw new Error("The seed phrase failed BIP-39 validation.");
   }
 
   mnemonic = Mnemonic.fromPhrase(seedPhrase);
@@ -53,7 +53,7 @@ try {
   accountNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", BASE_PATH);
   publicNode = accountNode.neuter();
 
-  console.log("\n=== ДАННЫЕ ДЛЯ СРАВНЕНИЯ ===\n");
+  console.log("\n=== DATA FOR COMPARISON ===\n");
   console.log(`DERIVATION PATH: ${BASE_PATH}`);
   console.log(`MASTER FINGERPRINT: ${masterNode.fingerprint}`);
   console.log(`ACCOUNT PUBLIC KEY: ${publicNode.publicKey}`);
@@ -67,9 +67,9 @@ try {
     console.log(`COMPRESSED PUBLIC KEY: ${child.publicKey}`);
   }
 
-  console.log("\nСравните XPUB и адреса с первоначальной бумажной записью. Данные не сохранены.\n");
+  console.log("\nCompare the XPUB and addresses against your original paper record. Nothing was saved.\n");
 } catch (error) {
-  console.error(`ОШИБКА: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
 } finally {
   seedPhrase = "";

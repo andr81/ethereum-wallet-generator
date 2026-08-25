@@ -5,26 +5,26 @@ IMAGE_REF="ethereum-offline-keygen:1.0.0"
 COUNT="${1:-5}"
 
 if [[ ! "${COUNT}" =~ ^[0-9]+$ ]] || (( COUNT < 1 || COUNT > 1000 )); then
-  echo "Использование: ./verify-recovery.sh [количество адресов от 1 до 1000]" >&2
+  echo "Usage: ./verify-recovery.sh [address count from 1 to 1000]" >&2
   exit 1
 fi
 
 if [[ $# -gt 1 ]]; then
-  echo "Ошибка: передано слишком много аргументов." >&2
+  echo "Error: too many arguments." >&2
   exit 1
 fi
 
 if [[ ! -t 0 || ! -t 1 ]]; then
-  echo "Ошибка: для безопасного скрытого ввода требуется интерактивный терминал." >&2
+  echo "Error: hidden input requires an interactive terminal." >&2
   exit 1
 fi
 
 if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
-  echo "Ошибка: Docker Engine недоступен." >&2
+  echo "Error: Docker Engine is unavailable." >&2
   exit 1
 fi
 
-echo "Физически отключите Wi-Fi и Ethernet перед вводом seed-фразы."
+echo "Physically disconnect Wi-Fi and Ethernet before entering the seed phrase."
 
 docker run \
   --rm \

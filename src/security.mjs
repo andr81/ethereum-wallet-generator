@@ -23,8 +23,8 @@ export function assertNoExternalNetwork() {
 
   if (found.length > 0) {
     throw new Error(
-      `Обнаружены внешние сетевые интерфейсы: ${found.join(", ")}. ` +
-        "Генерация разрешена только в контейнере с полностью отключённой сетью.",
+      `External network interfaces detected: ${found.join(", ")}. ` +
+        "Generation is only allowed in a container with networking fully disabled.",
     );
   }
 }
@@ -34,7 +34,7 @@ export function parseAddressCount(rawValue) {
 
   if (!Number.isSafeInteger(value) || value < 1 || value > MAX_ADDRESS_COUNT) {
     throw new Error(
-      `Количество адресов должно быть целым числом от 1 до ${MAX_ADDRESS_COUNT}.`,
+      `Address count must be an integer between 1 and ${MAX_ADDRESS_COUNT}.`,
     );
   }
 

@@ -4,7 +4,7 @@ set -euo pipefail
 IMAGE_REF="ethereum-offline-keygen:1.0.0"
 
 if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
-  echo "Ошибка: Docker Engine недоступен." >&2
+  echo "Error: Docker Engine is unavailable." >&2
   exit 1
 fi
 
