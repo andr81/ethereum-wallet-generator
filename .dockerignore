@@ -1,0 +1,12 @@
+.git
+.gitignore
+.DS_Store
+README.md
+*.sh
+node_modules
+npm-debug.log*
+*.seed
+*.mnemonic
+*.key
+*.log
+

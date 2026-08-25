@@ -1,0 +1,17 @@
+{
+  "name": "ethereum-offline-keygen",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline Ethereum HD wallet, XPUB and deposit address generator",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "check": "node --check src/security.mjs && node --check src/generate.mjs && node --check src/self-test.mjs && node --check src/verify-recovery.mjs && node --check src/derive-from-xpub.mjs",
+    "self-test": "node src/self-test.mjs"
+  },
+  "dependencies": {
+    "ethers": "6.17.0"
+  }
+}
