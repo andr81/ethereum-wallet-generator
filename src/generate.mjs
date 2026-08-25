@@ -18,7 +18,7 @@ try {
   mnemonic = Mnemonic.fromEntropy(entropy);
 
   const masterNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", "m");
-  const accountNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", BASE_PATH);
+  const accountNode = masterNode.derivePath(BASE_PATH);
   const publicNode = accountNode.neuter();
 
   console.log("\n=== SECRET DATA: COPY THIS ONTO PAPER ===\n");

@@ -32,7 +32,13 @@ async function readHiddenSeed() {
   });
 
   try {
-    return await new Promise((resolve) => readline.question("", resolve));
+    return await new Promise((resolve, reject) => {
+      // Ctrl-C and Ctrl-D must reject, or the outer catch/finally never run and
+      // the process exits on an unsettled await instead of a clear error.
+      readline.once("SIGINT", () => readline.close());
+      readline.once("close", () => reject(new Error("Seed phrase entry was aborted.")));
+      readline.question("", resolve);
+    });
   } finally {
     readline.close();
     process.stdout.write("\n");
@@ -50,7 +56,7 @@ try {
 
   mnemonic = Mnemonic.fromPhrase(seedPhrase);
   masterNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", "m");
-  accountNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", BASE_PATH);
+  accountNode = masterNode.derivePath(BASE_PATH);
   publicNode = accountNode.neuter();
 
   console.log("\n=== DATA FOR COMPARISON ===\n");

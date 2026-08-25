@@ -30,7 +30,13 @@ export function assertNoExternalNetwork() {
 }
 
 export function parseAddressCount(rawValue) {
-  const value = rawValue === undefined ? DEFAULT_ADDRESS_COUNT : Number(rawValue);
+  if (rawValue === undefined) {
+    return DEFAULT_ADDRESS_COUNT;
+  }
+
+  // Number() would happily read "1e3" as 1000 and "0x10" as 16, so the raw
+  // argument has to look like a plain decimal integer before it is converted.
+  const value = /^[0-9]+$/.test(String(rawValue)) ? Number(rawValue) : Number.NaN;
 
   if (!Number.isSafeInteger(value) || value < 1 || value > MAX_ADDRESS_COUNT) {
     throw new Error(
