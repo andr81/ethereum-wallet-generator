@@ -91,7 +91,14 @@ secret would leak into `ps` and the process environment.
 
 ### Why the path is exactly `m/44'/60'/0'/0`
 
-`BASE_PATH` is the account-level node, and `neuter()` is taken there. Children `/0`, `/1`, `/2` are
+`BASE_PATH` (`m/44'/60'/0'/0`) is the external-chain node and `ACCOUNT_PATH` (`m/44'/60'/0'`) sits
+one level above it. Both are exported as XPUBs because server code differs in which level it expects
+— account-level consumers derive `child(0).child(index)`, branch-level consumers derive
+`child(index)`, and both land on the same standard address. Feeding a consumer the wrong level
+derives one level too deep and yields foreign addresses, silently; self-test cross-checks that both
+keys agree, and any new export must keep that check honest.
+
+`neuter()` for the branch key is taken at `BASE_PATH`. Children `/0`, `/1`, `/2` are
 non-hardened, which is what lets a server derive addresses from a single XPUB without the seed
 phrase. A hardened level in the children's place would break the whole scheme. **`BASE_PATH` must
 not change once the first address has been issued** — every previously issued address becomes

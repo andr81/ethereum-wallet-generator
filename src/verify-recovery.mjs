@@ -2,6 +2,7 @@ import { Writable } from "node:stream";
 import { createInterface } from "node:readline";
 import { HDNodeWallet, Mnemonic, getAddress } from "ethers";
 import {
+  ACCOUNT_PATH,
   assertNoExternalNetwork,
   BASE_PATH,
   parseAddressCount,
@@ -11,6 +12,7 @@ let seedPhrase = "";
 let mnemonic;
 let masterNode;
 let accountNode;
+let branchNode;
 let publicNode;
 
 const hiddenOutput = new Writable({
@@ -56,14 +58,18 @@ try {
 
   mnemonic = Mnemonic.fromPhrase(seedPhrase);
   masterNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", "m");
-  accountNode = masterNode.derivePath(BASE_PATH);
-  publicNode = accountNode.neuter();
+  accountNode = masterNode.derivePath(ACCOUNT_PATH);
+  branchNode = masterNode.derivePath(BASE_PATH);
+  publicNode = branchNode.neuter();
 
   console.log("\n=== DATA FOR COMPARISON ===\n");
   console.log(`DERIVATION PATH: ${BASE_PATH}`);
   console.log(`MASTER FINGERPRINT: ${masterNode.fingerprint}`);
   console.log(`ACCOUNT PUBLIC KEY: ${publicNode.publicKey}`);
-  console.log(`XPUB: ${publicNode.extendedKey}`);
+  console.log(`\nACCOUNT XPUB (${ACCOUNT_PATH}) -- server derives child(0).child(index):`);
+  console.log(`  ${accountNode.neuter().extendedKey}`);
+  console.log(`BRANCH XPUB (${BASE_PATH}) -- server derives child(index):`);
+  console.log(`  ${publicNode.extendedKey}`);
 
   for (let index = 0; index < count; index += 1) {
     const child = publicNode.deriveChild(index);
@@ -82,5 +88,6 @@ try {
   mnemonic = undefined;
   masterNode = undefined;
   accountNode = undefined;
+  branchNode = undefined;
   publicNode = undefined;
 }

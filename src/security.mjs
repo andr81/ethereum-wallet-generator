@@ -1,5 +1,11 @@
 import { networkInterfaces } from "node:os";
 
+// The account node. Most tooling (hardware wallets, the "Account Extended Public
+// Key" field in BIP-39 tools) exports at this level and expects the consumer to
+// derive change/index itself.
+export const ACCOUNT_PATH = "m/44'/60'/0'";
+// The external-chain node, one level below. A consumer holding this key derives
+// an address with a single child index.
 export const BASE_PATH = "m/44'/60'/0'/0";
 export const DEFAULT_ADDRESS_COUNT = 5;
 export const MAX_ADDRESS_COUNT = 1000;

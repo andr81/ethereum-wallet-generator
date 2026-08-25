@@ -37,8 +37,25 @@ generator prints the seed phrase, the path, the master fingerprint, the account 
 XPUB, and per child a checksummed address with its compressed public key. The XPRV and per-address
 private keys are never printed.
 
-Because the XPUB belongs to the account node itself, a server derives every child address from it by
-index alone — no seed phrase, no private keys.
+### Two export keys, and why it matters
+
+The generator prints the extended public key at **two** levels, because server code differs in which
+one it expects, and the two look identical at a glance:
+
+| Key | Path | Depth | The server must derive |
+| --- | --- | --- | --- |
+| `ACCOUNT XPUB` | `m/44'/60'/0'` | 3 | `child(0).child(index)` |
+| `BRANCH XPUB` | `m/44'/60'/0'/0` | 4 | `child(index)` |
+
+Both reach the **same** standard address `m/44'/60'/0'/0/<index>`. In BIP-39 tools the first is the
+"Account Extended Public Key" field and the second is "BIP32 Extended Public Key"; hardware wallets
+export the account level.
+
+Giving a server the wrong one is silent and expensive: it derives one level too deep, to
+`m/44'/60'/0'/0/0/<index>`, and hands out addresses no ordinary wallet lists. Funds sent there are
+still recoverable from the seed with a custom derivation path — but only once you notice. Validate
+the level on the server: `HDNodeWallet.fromExtendedKey(xpub).depth` must equal the depth your
+derivation assumes.
 
 **No BIP-39 passphrase is used.** The optional 25th word is always empty, so restoring in another
 wallet requires leaving its passphrase field blank.
@@ -75,8 +92,8 @@ fully offline storage. Your terminal
 keeps it in scrollback until the window closes — clear it once the paper record is safe, and account
 for shell history, session recording and system swap.
 
-Only the XPUB of `m/44'/60'/0'/0`, the derivation path, and optionally the master fingerprint ever
-reach a server. The XPUB cannot spend funds, but it reveals every child address and the branch's
+Only one of the two XPUBs, the derivation path, and optionally the master fingerprint ever reach a
+server. The XPUB cannot spend funds, but it reveals every child address and the branch's
 financial history, so treat it as sensitive. `ACCOUNT PUBLIC KEY` is not a private key either.
 
 ## What Docker does and does not cover
@@ -104,13 +121,17 @@ wallet, a dedicated air-gapped machine, or an HSM.
 
 ## Using the XPUB on a server
 
-`src/derive-from-xpub.mjs` holds a minimal example and no real XPUB:
+`src/derive-from-xpub.mjs` holds a minimal example and no real XPUB. Pick the branch that matches
+the key you exported, and reject a key whose `.depth` does not match:
 
 ```js
 import { HDNodeWallet } from "ethers";
 
-const publicNode = HDNodeWallet.fromExtendedKey("xpub_REPLACE_WITH_YOUR_ACCOUNT_XPUB");
-console.log(publicNode.deriveChild(0).address);
+// Account XPUB, m/44'/60'/0' (depth 3)
+HDNodeWallet.fromExtendedKey(accountXpub).deriveChild(0).deriveChild(index).address;
+
+// Branch XPUB, m/44'/60'/0'/0 (depth 4)
+HDNodeWallet.fromExtendedKey(branchXpub).deriveChild(index).address;
 ```
 
 The server must reserve each index atomically and persist `user_id -> derivation_index -> address`.

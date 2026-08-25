@@ -1,5 +1,6 @@
 import { HDNodeWallet, Mnemonic, getAddress } from "ethers";
 import {
+  ACCOUNT_PATH,
   assertNoExternalNetwork,
   BASE_PATH,
   DEFAULT_ADDRESS_COUNT,
@@ -52,6 +53,28 @@ try {
     "The XPUB-derived address did not match the private HD node address.",
   );
 
+  // The two export keys must land on the same standard BIP-44 addresses, each via
+  // its own derivation. Getting this wrong hands a server foreign addresses.
+  const accountPublic = HDNodeWallet.fromExtendedKey(
+    HDNodeWallet.fromPhrase(TEST_MNEMONIC, "", "m").derivePath(ACCOUNT_PATH).neuter().extendedKey,
+  );
+  const branchPublic = HDNodeWallet.fromExtendedKey(xpub);
+  check(accountPublic.depth === 3, `Account XPUB must be at depth 3, got ${accountPublic.depth}.`);
+  check(branchPublic.depth === 4, `Branch XPUB must be at depth 4, got ${branchPublic.depth}.`);
+  for (let index = 0; index < 3; index += 1) {
+    const expected = getAddress(
+      HDNodeWallet.fromPhrase(TEST_MNEMONIC, "", `${BASE_PATH}/${index}`).address,
+    );
+    check(
+      getAddress(branchPublic.deriveChild(index).address) === expected,
+      `Branch XPUB child(${index}) did not match ${BASE_PATH}/${index}.`,
+    );
+    check(
+      getAddress(accountPublic.deriveChild(0).deriveChild(index).address) === expected,
+      `Account XPUB child(0).child(${index}) did not match ${BASE_PATH}/${index}.`,
+    );
+  }
+
   const generated = Mnemonic.fromEntropy(TEST_ENTROPY);
   check(
     generated.phrase === EXPECTED_24_WORD_PHRASE,
@@ -82,6 +105,7 @@ try {
   console.log(`Path: ${BASE_PATH}/0`);
   console.log(`Expected address: ${EXPECTED_ADDRESS}`);
   console.log("The XPUB-derived address matches the private HD node address.");
+  console.log("Account XPUB (depth 3) and branch XPUB (depth 4) agree on the same addresses.");
   console.log(`24-word entropy vector resolves to ${EXPECTED_24_WORD_ADDRESS}.`);
   console.log("Address-count validation accepts 1 and 1000 and rejects out-of-range input.");
   console.log("No external network interfaces present.");

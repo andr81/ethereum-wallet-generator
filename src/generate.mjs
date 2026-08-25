@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { HDNodeWallet, Mnemonic, getAddress } from "ethers";
 import {
+  ACCOUNT_PATH,
   assertNoExternalNetwork,
   BASE_PATH,
   parseAddressCount,
@@ -18,15 +19,22 @@ try {
   mnemonic = Mnemonic.fromEntropy(entropy);
 
   const masterNode = HDNodeWallet.fromPhrase(mnemonic.phrase, "", "m");
-  const accountNode = masterNode.derivePath(BASE_PATH);
-  const publicNode = accountNode.neuter();
+  const accountNode = masterNode.derivePath(ACCOUNT_PATH);
+  const branchNode = masterNode.derivePath(BASE_PATH);
+  const publicNode = branchNode.neuter();
 
   console.log("\n=== SECRET DATA: COPY THIS ONTO PAPER ===\n");
   console.log(`SEED PHRASE: ${mnemonic.phrase}`);
   console.log(`DERIVATION PATH: ${BASE_PATH}`);
   console.log(`MASTER FINGERPRINT: ${masterNode.fingerprint}`);
   console.log(`ACCOUNT PUBLIC KEY: ${publicNode.publicKey}`);
-  console.log(`XPUB: ${publicNode.extendedKey}`);
+  console.log("\nTwo export keys. Give your server the one matching how it derives:\n");
+  console.log(`ACCOUNT XPUB (${ACCOUNT_PATH}) -- server derives child(0).child(index):`);
+  console.log(`  ${accountNode.neuter().extendedKey}`);
+  console.log(`BRANCH XPUB (${BASE_PATH}) -- server derives child(index):`);
+  console.log(`  ${publicNode.extendedKey}`);
+  console.log("\nBoth produce the SAME standard addresses below. Sending the wrong one");
+  console.log("makes the server derive one level too deep and hand out foreign addresses.");
 
   for (let index = 0; index < count; index += 1) {
     const child = publicNode.deriveChild(index);
