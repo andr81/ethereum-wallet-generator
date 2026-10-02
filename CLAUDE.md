@@ -17,6 +17,7 @@ Documentation and all user-facing runtime strings are in English.
 ./self-test.sh            # the project's entire test suite
 ./generate.sh [N]         # production generation, requires typing GENERATE
 ./verify-recovery.sh [N]  # seed recovery, requires an interactive TTY
+./export-account.sh A [N] [--xprv]  # BIP-44 account A of an existing seed (one account per project)
 npm run check             # node --check across every entrypoint, no deps needed
 ```
 
@@ -24,7 +25,8 @@ npm run check             # node --check across every entrypoint, no deps needed
 
 There is no separate test runner: `src/self-test.mjs` *is* the suite — one deterministic vector (the
 public `test test … junk` phrase, expected address `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`)
-plus a cross-check that the XPUB-derived address matches the private-node one. To run a single
+plus a cross-check that the XPUB-derived address matches the private-node one, and account 1 against
+vectors recorded with Python `bip_utils` (an independent implementation). To run a single
 `.mjs` inside the image:
 
 ```bash
@@ -81,11 +83,16 @@ Only the XPUB, the derivation path and the master fingerprint travel to a server
 
 - `src/generate.mjs`, `src/verify-recovery.mjs` — handle the secret, offline only, zero their
   buffers in `finally`.
+- `src/export-account.mjs` — exports account `m/44'/60'/A'` of an existing seed: XPUB, deposit
+  addresses `0/i`, gas wallet `1/0`, and the account XPRV only with `--xprv` (the script asks for
+  `EXPORT`). This is the one place an extended private key is printed — for a server sweeper; one
+  account per project, never two projects on one account.
+- `src/seed-input.mjs` — hidden stdin entry and BIP-39 validation shared by the recovery-type entrypoints.
 - `src/derive-from-xpub.mjs` — the public half, a template for server code, never touches secrets.
-- `src/security.mjs` — shared invariants: `BASE_PATH`, `parseAddressCount`, the interface check,
+- `src/security.mjs` — shared invariants: `BASE_PATH`, `accountPath`/`parseAccountIndex`, `parseAddressCount`, the interface check,
   `wipeBytes`.
 
-`verify-recovery.mjs` reads the phrase only from stdin with echo suppressed (readline pointed at a
+`seed-input.mjs` reads the phrase only from stdin with echo suppressed (readline pointed at a
 throwaway `Writable` instead of a real output) — not from argv, not from the environment, or the
 secret would leak into `ps` and the process environment.
 

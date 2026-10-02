@@ -1,6 +1,9 @@
 import { HDNodeWallet, Mnemonic, getAddress } from "ethers";
 import {
   ACCOUNT_PATH,
+  accountPath,
+  MAX_ACCOUNT_INDEX,
+  parseAccountIndex,
   assertNoExternalNetwork,
   BASE_PATH,
   DEFAULT_ADDRESS_COUNT,
@@ -21,15 +24,27 @@ const EXPECTED_24_WORD_PHRASE =
   "abandon abandon abandon abandon abandon abandon abandon art";
 const EXPECTED_24_WORD_ADDRESS = "0xF278cF59F82eDcf871d630F28EcC8056f25C1cdb";
 
+// BIP-44 account 1 of the same public phrase, recorded with an independent
+// implementation (Python bip_utils), so this does not check ethers against itself.
+const ACCOUNT_1_XPUB =
+  "xpub6Ce9NcJvTk372KjsGfWqbcex5DumjpNquQLApoeQUavSCjEc823BV1tb4rXUuPuht8h2hSxkg2EXUaKUJmniJvRZAELxypsCzBFdtosmV76";
+const ACCOUNT_1_DEPOSITS = [
+  "0x8C8d35429F74ec245F8Ef2f4Fd1e551cFF97d650",
+  "0x40FBBE484b8Ee6139Af08446950B088e10b2306A",
+  "0x2b382887D362cCae885a421C978c7e998D3c95a6",
+];
+const ACCOUNT_1_GAS_WALLET = "0xcbE3C273fd195410Af072C9E731ebc8bf2de041d";
+const ACCOUNT_0_GAS_WALLET = "0x4b39F7b0624b9dB86AD293686bc38B903142dbBc";
+
 function check(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-function rejects(rawValue) {
+function rejects(rawValue, parse = parseAddressCount) {
   try {
-    parseAddressCount(rawValue);
+    parse(rawValue);
   } catch {
     return true;
   }
@@ -88,6 +103,44 @@ try {
     `The 24-word vector produced ${generatedChild.address} instead of ${EXPECTED_24_WORD_ADDRESS}.`,
   );
 
+  // A second project on the same seed lives on its own account: none of its
+  // deposit addresses or its gas wallet may coincide with account 0.
+  check(accountPath(0) === ACCOUNT_PATH, `accountPath(0) must equal ${ACCOUNT_PATH}.`);
+  const master = HDNodeWallet.fromPhrase(TEST_MNEMONIC, "", "m");
+  const account1 = master.derivePath(accountPath(1));
+  const account1Public = HDNodeWallet.fromExtendedKey(account1.neuter().extendedKey);
+  check(account1Public.extendedKey === ACCOUNT_1_XPUB, "Account 1 XPUB did not match the vector.");
+  check(account1Public.depth === 3, `Account 1 XPUB must be at depth 3, got ${account1Public.depth}.`);
+  check(account1Public.index === 0x80000001, "Account 1 XPUB must carry hardened index 1'.");
+  check(
+    HDNodeWallet.fromExtendedKey(account1.extendedKey).neuter().extendedKey === ACCOUNT_1_XPUB,
+    "Account 1 XPRV does not neuter to the account 1 XPUB.",
+  );
+  const account0Addresses = new Set([ACCOUNT_0_GAS_WALLET]);
+  for (let index = 0; index < 3; index += 1) {
+    account0Addresses.add(getAddress(accountPublic.deriveChild(0).deriveChild(index).address));
+  }
+  ACCOUNT_1_DEPOSITS.forEach((expected, index) => {
+    const derived = getAddress(account1Public.deriveChild(0).deriveChild(index).address);
+    check(derived === expected, `Account 1 deposit ${index} was ${derived}, expected ${expected}.`);
+    check(!account0Addresses.has(derived), `Account 1 deposit ${index} collides with account 0.`);
+  });
+  const gas0 = getAddress(accountPublic.deriveChild(1).deriveChild(0).address);
+  const gas1 = getAddress(account1Public.deriveChild(1).deriveChild(0).address);
+  check(gas0 === ACCOUNT_0_GAS_WALLET, `Account 0 gas wallet was ${gas0}.`);
+  check(gas1 === ACCOUNT_1_GAS_WALLET, `Account 1 gas wallet was ${gas1}.`);
+  check(parseAccountIndex("0") === 0 && parseAccountIndex("1") === 1, "Account 0/1 rejected.");
+  check(
+    parseAccountIndex(String(MAX_ACCOUNT_INDEX)) === MAX_ACCOUNT_INDEX,
+    "The largest account index was rejected.",
+  );
+  for (const rejected of ["", "-1", "01", "1.5", "1e3", "0x1", String(MAX_ACCOUNT_INDEX + 1), undefined]) {
+    check(
+      rejects(rejected, parseAccountIndex),
+      `Account ${JSON.stringify(rejected)} should have been rejected.`,
+    );
+  }
+
   check(
     parseAddressCount(undefined) === DEFAULT_ADDRESS_COUNT,
     "An omitted count did not fall back to the default.",
@@ -106,6 +159,7 @@ try {
   console.log(`Expected address: ${EXPECTED_ADDRESS}`);
   console.log("The XPUB-derived address matches the private HD node address.");
   console.log("Account XPUB (depth 3) and branch XPUB (depth 4) agree on the same addresses.");
+  console.log("Account 1 matches independent vectors and shares no address with account 0.");
   console.log(`24-word entropy vector resolves to ${EXPECTED_24_WORD_ADDRESS}.`);
   console.log("Address-count validation accepts 1 and 1000 and rejects out-of-range input.");
   console.log("No external network interfaces present.");

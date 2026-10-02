@@ -8,7 +8,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "check": "node --check src/security.mjs && node --check src/generate.mjs && node --check src/self-test.mjs && node --check src/verify-recovery.mjs && node --check src/derive-from-xpub.mjs",
+    "check": "node --check src/security.mjs && node --check src/generate.mjs && node --check src/self-test.mjs && node --check src/verify-recovery.mjs && node --check src/derive-from-xpub.mjs && node --check src/seed-input.mjs && node --check src/export-account.mjs",
     "self-test": "node src/self-test.mjs"
   },
   "dependencies": {

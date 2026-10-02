@@ -21,6 +21,7 @@ Dependencies cannot be fetched inside a fully offline container, so the process 
 ./self-test.sh            # deterministic check, no real secrets
 ./generate.sh 10          # offline; type GENERATE to confirm
 ./verify-recovery.sh 10   # offline; re-derive from a seed you type back
+./export-account.sh 1 5   # offline; XPUB + addresses of BIP-44 account 1 of an existing seed
 ```
 
 Address count is optional, 1–1000, default 5.
@@ -82,6 +83,23 @@ its control.
 The code then zeroes buffers and drops references, but JavaScript strings are immutable and the
 garbage collector may leave copies in memory. Discarding the container shortens process lifetime; it
 does not give provable memory wiping.
+
+## One seed, several projects
+
+Two servers must never share one account XPUB: both would hand out `0/0` to their first user, credit
+the same transfer twice, and their sweepers would fight over the same addresses, gas wallet and
+nonces. Give each project its own BIP-44 account of the same seed instead —
+`m/44'/60'/0'`, `m/44'/60'/1'`, … — one paper backup, no shared addresses.
+
+```bash
+./export-account.sh 1 5          # account XPUB, deposit addresses 0/i, gas wallet 1/0
+./export-account.sh 1 5 --xprv   # plus the account XPRV for a sweeper; type EXPORT to confirm
+```
+
+The account level is hardened, so a leaked account XPRV spends only that account's addresses and
+reveals neither the seed nor any other account. It is still a hot key: it goes straight from the
+terminal into the server's secret store. In wallets that follow BIP-44 (MetaMask, Ledger Live) account
+`N` is "Account N+1".
 
 ## What is secret
 
